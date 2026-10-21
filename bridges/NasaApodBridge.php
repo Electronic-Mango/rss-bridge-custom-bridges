@@ -15,20 +15,32 @@ class NasaApodBridge extends FeedExpander
 
     protected function parseItem(array $item)
     {
-        // NASA embeds a complete HTML document in each feed item's content.
-        $html = str_get_html($item['content']);
-        $body = $html ? $html->find('body', 0) : null;
-        if (!$body) {
-            throw new \Exception('Unable to find APOD feed item body: ' . $item['uri']);
+        if (!isset($item['apod'])) {
+            return null;
+        }
+        $apod = $item['apod'];
+
+        // Prepare image hyperlink, if present
+        $media = '';
+        if (!empty($apod['hdurl'])) {
+            $imageUri = e($apod['hdurl']);
+            $imageAlt = e($apod['alt'] ?? '');
+            $media = sprintf(
+                '<a href="%s"><img src="%s" alt="%s" /></a><br />',
+                $imageUri,
+                $imageUri,
+                $imageAlt
+            );
         }
 
-        defaultLinkTo($body, $item['uri']);
-        foreach ($body->find('iframe, video, source') as $media) {
-            if ($media->src) {
-                $media->src = urljoin($item['uri'], $media->src);
-            }
-        }
-        $item['content'] = $body->innertext;
+        // Prepare explanation and remove duplicated "Explanation:" prefix
+        $explanation = preg_replace(
+            '/\A(<strong>Explanation:\s*<\/strong>\s*)<b>Explanation<\/b>\s*:\s*/iu',
+            '$1',
+            $apod['explanation'] ?? ''
+        );
+
+        $item['content'] = $media . $explanation;
         return $item;
     }
 
